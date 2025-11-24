@@ -7,7 +7,7 @@ import { StationCard } from '../../components/station/StationCard';
 import { ChargingSessionPanel } from '../../components/charging/ChargingSessionPanel';
 import { WalletPanel } from '../../components/payment/WalletPanel';
 import { QRScannerButton } from '../../components/shared/QRScannerButton';
-import { Zap, Car, Plus, Trash2, CreditCard, Building2, CalendarClock } from 'lucide-react';
+import { Zap, Car, Plus, Trash2, CreditCard, Building2, FileText, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import "../../styles/globals.css";
 import axios from 'axios';
@@ -17,7 +17,9 @@ import {
     apiAddVehicle,
     apiDeleteVehicle,
     apiGetPaymentMethods,
-    apiDeletePaymentMethod
+    apiDeletePaymentMethod,
+    apiGetMyInvoices,
+    apiPayInvoice
 } from '../../api/DriverAPI';
 import {
     apiGetAllSessions,
@@ -31,6 +33,7 @@ import {
 } from '../../api/BookingAPI';
 import { AddVehicleModal } from '../../components/vehicle/AddVehicleModal';
 import { AddPaymentMethodModal } from '../../components/payment/AddPaymentMethodModal';
+import { InvoiceModal } from '../../components/Invoice/InvoiceModal';
 
 import {
     ChargeSessionDto,
@@ -40,11 +43,9 @@ import {
     ChargingStationDto,
     VehicleDto,
     PaymentMethodDto,
-    BookingDto
+    BookingDto,
+    InvoiceDto
 } from '../../types';
-
-import { ChatbotPanel } from '../../components/chatbot/ChatbotPanel';
-import { apiSendChatMessage, apiClearChatHistory } from '../../api/ChatbotAPI';
 
 interface DriverDashboardProps {
     onNavigate: (path: string) => void;
@@ -123,6 +124,44 @@ function BookingCard({ booking, onCancel }: { booking: BookingDto, onCancel: () 
     );
 }
 
+function InvoiceCard({ invoice, onPay }: { invoice: InvoiceDto, onPay: (id: number) => void }) {
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
+
+    return (
+        <div className="p-4 rounded-lg border bg-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-full ${invoice.status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                    <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                    <p className="font-medium">Hóa đơn #{invoice.invoiceId}</p>
+                    <p className="text-sm text-gray-500">
+                        {new Date(invoice.issueDate).toLocaleDateString('vi-VN')}
+                    </p>
+                </div>
+            </div>
+            <div className="text-right">
+                <p className="font-bold">{formatCurrency(invoice.amount)}</p>
+                {invoice.status === 'PAID' ? (
+                    <span className="text-xs text-green-600 flex items-center justify-end gap-1">
+                        <CheckCircle className="h-3 w-3" /> Đã thanh toán
+                    </span>
+                ) : (
+                    <Button
+                        variant="link"
+                        size="sm"
+                        className="text-blue-600 p-0 h-auto"
+                        onClick={() => onPay(invoice.invoiceId)}
+                    >
+                        Thanh toán ngay
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialogChange }: DriverDashboardProps) {
 
@@ -131,44 +170,44 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
     const [stations, setStations] = useState<ChargingStationDto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [walletBalance, setWalletBalance] = useState(0);
+
     const [isAddVehicleModalOpen, setIsAddVehicleModalOpen] = useState(false);
     const [isAddMethodModalOpen, setIsAddMethodModalOpen] = useState(false);
+
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethodDto[]>([]);
     const [bookings, setBookings] = useState<BookingDto[]>([]);
-    const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+    const [invoices, setInvoices] = useState<InvoiceDto[]>([]);
+
+    const [completedSession, setCompletedSession] = useState<ChargeSessionDto | null>(null);
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
 
     const loadDashboardData = async () => {
-        console.log("Đang tải dữ liệu dashboard...");
         try {
             setIsLoading(true);
 
-            const [profile, allSessions, allStations, methods, myBookings] = await Promise.all([
+            const [profile, allSessions, allStations, methods, myBookings, myInvoices] = await Promise.all([
                 apiGetDriverProfile(),
                 apiGetAllSessions(),
                 apiGetAllStations(),
                 apiGetPaymentMethods(),
-                apiGetMyBookings()
+                apiGetMyBookings(),
+                apiGetMyInvoices()
             ]);
 
             setDriverProfile(profile);
             setWalletBalance(profile.walletBalance);
-            console.log("Tải hồ sơ thành công:", profile);
 
             const runningSession = allSessions.find(session => session.status === 'ACTIVE');
             setActiveSession(runningSession || null);
-            console.log("Tải phiên sạc thành công:", runningSession);
 
             setStations(allStations);
-            console.log("Tải trạm sạc thành công:", allStations);
-
             setPaymentMethods(methods);
-            console.log("Tải phương thức thanh toán thành công:", methods);
-
             setBookings(myBookings.filter(b => b.status === 'PENDING' || b.status === 'CONFIRMED'));
-            console.log("Tải đặt chỗ thành công:", myBookings);
+            setInvoices(myInvoices);
 
         } catch (error) {
-            console.error('Không thể tải dữ liệu dashboard:', error);
+            console.error('Failed to load dashboard data:', error);
             toast.error('Lỗi khi tải dữ liệu. Vui lòng thử đăng nhập lại.');
         } finally {
             setIsLoading(false);
@@ -178,26 +217,6 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
     useEffect(() => {
         loadDashboardData();
     }, []);
-
-    const handleSendChatMessage = async (message: string): Promise<string> => {
-    try {
-        const response = await apiSendChatMessage(message);
-        return response.response;
-      } catch (error) {
-        console.error('Error sending chat message:', error);
-        throw error;
-      }
-    };
-
-    const handleClearChatHistory = async () => {
-    try {
-        await apiClearChatHistory();
-        toast.success('Đã xóa lịch sử chat');
-      } catch (error) {
-        console.error('Error clearing chat history:', error);
-        toast.error('Không thể xóa lịch sử chat');
-      }
-   };
 
     const handleStationClick = (stationId: number) => {
         onNavigate(`/driver/station/${stationId}`);
@@ -253,9 +272,19 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
         };
         try {
             const stoppedSession = await apiStopSession(activeSession.sessionId, stopData);
+
             setActiveSession(null);
-            toast.success('Đã dừng phiên sạc.');
             setWalletBalance(prev => prev - stoppedSession.cost);
+
+            setCompletedSession(stoppedSession);
+            setIsInvoiceModalOpen(true);
+
+            toast.success('Đã dừng phiên sạc.');
+
+            // Tải lại hóa đơn mới nhất
+            const updatedInvoices = await apiGetMyInvoices();
+            setInvoices(updatedInvoices);
+
         } catch (error: any) {
             console.error('Failed to stop session:', error);
             let errorMessage = "Không thể dừng phiên sạc.";
@@ -264,6 +293,11 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
             }
             toast.error(errorMessage);
         }
+    };
+
+    const handleInvoiceModalClose = () => {
+        setIsInvoiceModalOpen(false);
+        setCompletedSession(null);
     };
 
     const handleVehicleChange = async () => {
@@ -318,6 +352,25 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
                 setBookings(myBookings.filter(b => b.status === 'PENDING' || b.status === 'CONFIRMED'));
             } catch (error) {
                 toast.error("Không thể hủy đặt chỗ.");
+            }
+        }
+    };
+
+    const handlePayInvoice = async (invoiceId: number) => {
+        if (paymentMethods.length === 0) {
+            toast.error("Vui lòng thêm phương thức thanh toán trước.");
+            return;
+        }
+        if (window.confirm("Thanh toán hóa đơn này bằng phương thức mặc định?")) {
+            try {
+                const defaultMethod = paymentMethods.find(m => m.isDefault) || paymentMethods[0];
+                await apiPayInvoice(invoiceId, defaultMethod.id);
+                toast.success("Thanh toán thành công!");
+
+                const updatedInvoices = await apiGetMyInvoices();
+                setInvoices(updatedInvoices);
+            } catch (error) {
+                toast.error("Thanh toán thất bại.");
             }
         }
     };
@@ -404,6 +457,28 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
                         isOpen={isWalletDialogOpen}
                         onOpenChange={onWalletDialogChange}
                     />
+
+                    {/* INVOICE HISTORY CARD */}
+                    <Card className="p-6 rounded-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium">Lịch sử Hóa đơn</h3>
+                        </div>
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                            {invoices.length === 0 ? (
+                                <p className="text-sm text-gray-500 text-center py-4">
+                                    Chưa có hóa đơn nào.
+                                </p>
+                            ) : (
+                                invoices.map(invoice => (
+                                    <InvoiceCard
+                                        key={invoice.invoiceId}
+                                        invoice={invoice}
+                                        onPay={handlePayInvoice}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </Card>
 
                     <Card className="p-6 rounded-2xl">
                         <div className="flex items-center justify-between mb-4">
@@ -497,12 +572,13 @@ export function DriverDashboard({ onNavigate, isWalletDialogOpen, onWalletDialog
                 driverId={driverProfile.id}
             />
 
-            <ChatbotPanel
-                onSendMessage={handleSendChatMessage}
-                onClearHistory={handleClearChatHistory}
-                isOpen={isChatbotOpen}
-                onToggle={() => setIsChatbotOpen(!isChatbotOpen)}
-            />
+            {completedSession && (
+                <InvoiceModal
+                    isOpen={isInvoiceModalOpen}
+                    onClose={handleInvoiceModalClose}
+                    session={completedSession}
+                />
+            )}
         </div>
     );
 }

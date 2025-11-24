@@ -203,3 +203,18 @@ export interface ChatHistoryDto {
     botResponse: string;
     timestamp: string;
 }
+
+export interface InvoiceDto {
+    invoiceId: number;
+    chargeSessionId: number;
+    driverId: number;
+    issueDate: string;
+    totalEnergy: number;
+    amount: number;
+    paymentMethodId: number | null;
+    status: 'PENDING' | 'PAID' | 'CANCELLED';
+}
+
+export interface PayInvoiceRequest {
+    paymentMethodId: number;
+}
