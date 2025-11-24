@@ -4,7 +4,7 @@ import {
     CreateVehicleRequest,
     VehicleDto,
     WalletBalanceApiResponse, WalletTopUpRequest, PaymentMethodDto,
-    CreatePaymentMethodRequest
+    CreatePaymentMethodRequest, PayInvoiceRequest, InvoiceDto
 } from '../types';
 
 export const apiGetDriverProfile = async (): Promise<EVDriverProfileDto> => {
@@ -54,5 +54,16 @@ export const apiUpdateDriverProfile = async (data: {
     phoneNumber: string;
 }): Promise<EVDriverProfileDto> => {
     const response = await API.put('/evdrivers/me', data);
+    return response.data;
+};
+
+export const apiGetMyInvoices = async (): Promise<InvoiceDto[]> => {
+    const response = await API.get('/invoices');
+    return response.data;
+};
+
+export const apiPayInvoice = async (invoiceId: number, paymentMethodId: number): Promise<InvoiceDto> => {
+    const data: PayInvoiceRequest = { paymentMethodId };
+    const response = await API.post(`/invoices/${invoiceId}/pay`, data);
     return response.data;
 };
