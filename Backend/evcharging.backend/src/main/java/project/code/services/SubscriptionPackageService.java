@@ -64,7 +64,6 @@ public class SubscriptionPackageService {
         return subscriptionPackageRepository.findByNameContainingIgnoreCase(keyword);
     }
 
-    // (6) SỬA LỖI: Nhận vào Enum, không phải String
     public List<SubscriptionPackage> getPackagesByType(SubscriptionType type) {
         return subscriptionPackageRepository.findByType(type);
     }

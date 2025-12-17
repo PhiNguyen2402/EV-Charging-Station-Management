@@ -32,7 +32,7 @@ public class JwtConfig {
         return extractClaim(token, Claims::getSubject);
     }
 
-    // Trích xuất một claim (thông tin) cụ thể từ token
+    // Trích xuất thông tin cụ thể từ token
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
@@ -75,7 +75,7 @@ public class JwtConfig {
         return extractClaim(token, Claims::getExpiration);
     }
 
-    // Trích xuất toàn bộ thông tin (claims) từ token
+    // Trích xuất toàn bộ thông tin từ token
     public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSignInKey())
