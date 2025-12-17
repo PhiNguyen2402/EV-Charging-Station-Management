@@ -3,6 +3,7 @@ package project.code.services;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import project.code.model.*;
 import project.code.model.enums.BookingStatus;
@@ -11,7 +12,6 @@ import project.code.dto.booking.CreateBookingRequest;
 import project.code.dto.booking.BookingDto;
 
 import jakarta.persistence.EntityNotFoundException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,11 +24,19 @@ public class BookingService {
     private final EVDriverRepository driverRepository;
     private final CSStaffRepository csStaffRepository;
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingDto createBooking(User currentUser, CreateBookingRequest request) {
         EVDriver driver = findDriverProfileByUser(currentUser);
-        ChargingPoint point = pointRepository.findById(request.chargingPointId())
+
+        ChargingPoint point = pointRepository.findByIdWithLock(request.chargingPointId())
                 .orElseThrow(() -> new EntityNotFoundException("Charging Point not found"));
+
+        try {
+            System.out.println("User " + currentUser.getEmail() + " đang giữ khóa và xử lý...");
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         if (request.startTime().isAfter(request.endTime())) {
             throw new IllegalArgumentException("Thời gian kết thúc phải sau thời gian bắt đầu.");
@@ -36,6 +44,7 @@ public class BookingService {
 
         boolean isOccupied = bookingRepository.existsOverlappingBooking(point, request.startTime(), request.endTime());
         if (isOccupied) {
+            System.out.println("User " + currentUser.getEmail() + " thất bại: Đã bị trùng!");
             throw new IllegalStateException("Cổng sạc này đã được đặt trong khung giờ bạn chọn.");
         }
 
@@ -48,7 +57,10 @@ public class BookingService {
                 .status(BookingStatus.PENDING)
                 .build();
 
-        return mapToDto(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        System.out.println("User " + currentUser.getEmail() + " đặt thành công!");
+
+        return mapToDto(savedBooking);
     }
 
     @Transactional(readOnly = true)

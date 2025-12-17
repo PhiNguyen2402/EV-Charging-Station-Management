@@ -101,7 +101,7 @@ public class EVDriverController {
         try {
             WalletBalanceApiResponse updatedBalance = evDriverService.topUpWallet(currentUser, request);
 
-            System.out.println("--- DEBUG: Service 'topUpWallet' đã thực thi thành công.");
+            System.out.println("Service 'topUpWallet' đã thực thi thành công.");
 
             return ResponseEntity.ok(updatedBalance);
 

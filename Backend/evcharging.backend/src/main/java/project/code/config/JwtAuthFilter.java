@@ -84,13 +84,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
-                            authorities // <-- Dùng quyền từ Token
+                            authorities
                     );
                     authToken.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request)
                     );
 
-                    // 6. Lưu thông tin xác thực vào SecurityContext
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     logger.info("JwtAuthFilter: Authenticated user: {} successfully.", userEmail);
                 }
