@@ -92,14 +92,11 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
-<!-- (ĐÃ SỬA) Thêm cấu hình để chỉ rõ Main Class -->
         <configuration>
-          <!-- Đường dẫn này được xác nhận là đúng bởi ảnh chụp màn hình của bạn -->
           <mainClass>project.code.Application</mainClass> 
         </configuration>
       </plugin>
-      
-      <!-- Cấu hình compiler (đã đúng, giữ nguyên) -->
+
       <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
